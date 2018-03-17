@@ -2,6 +2,7 @@ package com.maciek.rpc;
 
 import com.maciek.async.DefaultAsyncCallback;
 import com.maciek.model.Method;
+import com.maciek.util.IdUtil;
 import com.maciek.util.ParameterUtil;
 import org.apache.xmlrpc.AsyncCallback;
 import org.apache.xmlrpc.XmlRpcClient;
@@ -13,23 +14,27 @@ import java.util.Vector;
 
 public class ClientRPC {
 
-    private static String serverAddress = "localhost";
-    private static String serverPort;
-    private static String serverName = "defaultServer";
-    private static XmlRpcClient server;
-    private static List<Method> serverMethods;
-    private static AsyncCallback asyncCallback = new DefaultAsyncCallback();
-    private static Scanner sc = new Scanner(System.in);
+    private String serverAddress = "localhost";
+    private String serverPort;
+    private final List<Integer> serverPortIds;
+    private String serverName = "defaultServer";
+    private XmlRpcClient server;
+    private List<Method> serverMethods;
+    private AsyncCallback asyncCallback = new DefaultAsyncCallback();
+    private Scanner sc = new Scanner(System.in);
 
-    public ClientRPC(Integer serverPort) {
-        ClientRPC.serverPort = serverPort.toString();
+    public ClientRPC(List<Integer> serverPortIds) {
+        this.serverPortIds = serverPortIds;
     }
 
     public void run() {
         try {
-            getConfigurationFromUser();
-            askForServerMethods();
+            //printAvailableServers();
+            //getConfigurationFromUser();
             while (true) {
+                System.out.println("\nEnter server id: ");
+                int chosenServerPort = IdUtil.toPort(sc.next().trim());
+                loadServerMethods(getServerMethods(chosenServerPort));
                 printServerMethods();
                 System.out.println("Enter ID of method to call it: ");
                 int id = Integer.parseInt(sc.next().trim());
@@ -43,10 +48,20 @@ public class ClientRPC {
         }
     }
 
-    private void askForServerMethods() throws Exception {
-        server = new XmlRpcClient("http://" + serverAddress + ":" + serverPort);
-        Object result = server.execute(serverName + ".show", new Vector<>());
-        loadServerMethods(result);
+    private void printAvailableServers() {
+        System.out.println("\nAvailable servers: ");
+        serverPortIds.forEach(id -> System.out.print(id + " "));
+    }
+
+    public Vector getServerMethods(Integer serverPort) throws Exception {
+        if (isCenterOfStar()) {
+            server = new XmlRpcClient("http://" + serverAddress + ":" + serverPort);
+        } else {
+            server = new XmlRpcClient("http://" + serverAddress + ":" + IdUtil.toPort(serverPortIds.get(0)));
+        }
+        Vector<Integer> params = new Vector<>();
+        params.add(IdUtil.toId(serverPort));
+        return (Vector) server.execute(serverName + ".show", params);
     }
 
     private void getConfigurationFromUser() {
@@ -80,7 +95,7 @@ public class ClientRPC {
         return serverMethods.get(index);
     }
 
-    private void callMethod(int methodIndex, boolean async) throws Exception {
+    private void callMethod(int destinationPort, int methodIndex, boolean async) throws Exception {
         Method method = getServerMethod(methodIndex);
         Vector<String> paramTypes = method.paramTypes;
         Vector<Object> callParams = new Vector<>();
@@ -97,6 +112,10 @@ public class ClientRPC {
         } else {
             System.out.println("Server response: " + server.execute(serverName + "." + method.name, callParams));
         }
+    }
+
+    private boolean isCenterOfStar() {
+        return serverPortIds.size() > 1;
     }
 
 }

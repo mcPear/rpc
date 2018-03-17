@@ -1,13 +1,24 @@
 package com.maciek.rpc;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import static java.util.Arrays.asList;
+
 public class HybridRPC {
 
-    private static final Integer THIS_SERVER_PORT = 8090;
-    private static final Integer LISTEN_SERVER_PORT = 8080;
-
     public static void main(String[] args) {
-        ServerRPC.run(THIS_SERVER_PORT);
-        new ClientRPC(LISTEN_SERVER_PORT).run();
+        List<Integer> argz = new ArrayList<>(Arrays.asList(args)).stream().map(Integer::parseInt).collect(Collectors.toList());
+        int id = argz.get(0);
+        int serverPort = 8080 + id;
+        List<Integer> connectedServerIds = argz.subList(1, argz.size());
+
+        ClientRPC client = new ClientRPC(connectedServerIds);
+        ServerRPC server = new ServerRPC(client, id);
+        server.run(serverPort);
+        client.run();
     }
 
     //TRASH
