@@ -32,19 +32,38 @@ public class ClientRPC {
             printAvailableAsyncServers();
             //getConfigurationFromUser();
             while (true) {
-                System.out.println("\nEnter server id: ");
-                int chosenServerPort = IdUtil.toPort(sc.next().trim());
-                loadServerMethods(getServerMethods(chosenServerPort));
-                printServerMethods();
-                System.out.println("Enter ID of method to call it: ");
-                int id = Integer.parseInt(sc.next().trim());
-                System.out.println("Async call ? y/n: ");
-                boolean async = sc.next().trim().equals("y");
-                callMethod(chosenServerPort, id, async);
+                runInLoop();
             }
         } catch (Exception e) {
             e.printStackTrace();
             System.err.println("Klient XML-RPC: " + e);
+        }
+    }
+
+    private void runInLoop() throws Exception {
+        System.out.println("\nEnter server id: ");
+        int chosenServerPort = IdUtil.toPort(sc.next().trim());
+        boolean isServerIdAvailable = tryToLoadServerMethods(chosenServerPort);
+        if (isServerIdAvailable) {
+            printServerMethods();
+            System.out.println("Enter ID of method to call it: ");
+            int id = Integer.parseInt(sc.next().trim());
+            boolean async = false;
+            if (isDirectlyConnected(chosenServerPort)) {
+                System.out.println("Async call ? y/n: ");
+                async = sc.next().trim().equals("y");
+            }
+            callMethod(chosenServerPort, id, async);
+        }
+    }
+
+    private boolean tryToLoadServerMethods(int chosenServerPort) {
+        try {
+            loadServerMethods(getServerMethods(chosenServerPort));
+            return true;
+        } catch (Exception e) {
+            System.out.println("Server id: " + IdUtil.toId(chosenServerPort) + "  is unavailable");
+            return false;
         }
     }
 
@@ -143,7 +162,7 @@ public class ClientRPC {
     }
 
     private boolean isDirectlyConnected(int destinationPort) {
-        return serverPortIds.contains(IdUtil.toId(destinationPort))
+        return serverPortIds.contains(IdUtil.toId(destinationPort));
     }
 
     private void getConfigurationFromUser() {
