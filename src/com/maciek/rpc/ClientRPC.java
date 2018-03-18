@@ -29,7 +29,7 @@ public class ClientRPC {
 
     public void run() {
         try {
-            //printAvailableServers();
+            printAvailableAsyncServers();
             //getConfigurationFromUser();
             while (true) {
                 System.out.println("\nEnter server id: ");
@@ -40,7 +40,7 @@ public class ClientRPC {
                 int id = Integer.parseInt(sc.next().trim());
                 System.out.println("Async call ? y/n: ");
                 boolean async = sc.next().trim().equals("y");
-                callMethod(id, async);
+                callMethod(chosenServerPort, id, async);
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -48,8 +48,8 @@ public class ClientRPC {
         }
     }
 
-    private void printAvailableServers() {
-        System.out.println("\nAvailable servers: ");
+    private void printAvailableAsyncServers() {
+        System.out.println("\nAvailable async servers: ");
         serverPortIds.forEach(id -> System.out.print(id + " "));
     }
 
@@ -62,19 +62,6 @@ public class ClientRPC {
         Vector<Integer> params = new Vector<>();
         params.add(IdUtil.toId(serverPort));
         return (Vector) server.execute(serverName + ".show", params);
-    }
-
-    private void getConfigurationFromUser() {
-        System.out.println("Konfiguracja klienta. Użyć domyślnej ? y/n");
-//        if (false) {
-        if (!sc.next().trim().equals("y")) {
-            System.out.println("Podaj IP lub DNS serwera: ");
-            serverAddress = sc.next().trim();
-            System.out.println("Podaj port serwera: ");
-            serverPort = sc.next().trim();
-            System.out.println("Podaj nazwę serwera: ");
-            serverName = sc.next().trim();
-        }
     }
 
     private void loadServerMethods(Object methods) {
@@ -96,7 +83,39 @@ public class ClientRPC {
     }
 
     private void callMethod(int destinationPort, int methodIndex, boolean async) throws Exception {
+        if (isDirectlyConnected(destinationPort)) {
+            callDirectMethod(methodIndex, async);
+        } else {
+            redirectMethod(destinationPort, methodIndex);
+        }
+    }
+
+    private Vector callDirectMethod(int methodIndex, boolean async) throws Exception {
         Method method = getServerMethod(methodIndex);
+        Vector<Object> callParams = getMethodCallParamsFromUser(method);
+        if (async) {
+            System.out.println("Sent async call to thisServer");
+            server.executeAsync(serverName + "." + method.name, callParams, asyncCallback);
+            return null;
+        } else {
+            Object response = server.execute(serverName + "." + method.name, callParams);
+            System.out.println("Server response: " + response);
+            return (Vector) response;
+        }
+    }
+
+    private void redirectMethod(int destinationPort, int methodIndex) throws Exception {
+        Method method = getServerMethod(methodIndex);
+        Vector<Object> callParams = getMethodCallParamsFromUser(method);
+        server = new XmlRpcClient("http://" + serverAddress + ":" + IdUtil.toPort(serverPortIds.get(0)));
+        Vector params = new Vector();
+        params.add(destinationPort);
+        params.add(methodIndex);
+        params.add(callParams);
+        System.out.println("Server response: " + server.execute(serverName + ".redirectMethodCall", params));
+    }
+
+    private Vector getMethodCallParamsFromUser(Method method) {
         Vector<String> paramTypes = method.paramTypes;
         Vector<Object> callParams = new Vector<>();
         System.out.println("Calling method " + method.fullName);
@@ -106,16 +125,38 @@ public class ClientRPC {
             System.out.println("Param " + param);
             callParams.addElement(ParameterUtil.resolveParam(param, paramTypes.get(i)));
         }
-        if (async) {
-            System.out.println("Sent async call to thisServer");
-            server.executeAsync(serverName + "." + method.name, callParams, asyncCallback);
-        } else {
-            System.out.println("Server response: " + server.execute(serverName + "." + method.name, callParams));
-        }
+        return callParams;
+    }
+
+    public Vector callMethodUsingCallParams(int destinationPort, int methodIndex, Vector callParams) throws Exception {
+        loadServerMethods(getServerMethods(destinationPort));
+        Method method = getServerMethod(methodIndex);
+        server = new XmlRpcClient("http://" + serverAddress + ":" + destinationPort);
+        System.out.println("Calling method " + method.fullName);
+        Object response = server.execute(serverName + "." + method.name, callParams);
+        System.out.println("Server response: " + response);
+        return (Vector) response;
     }
 
     private boolean isCenterOfStar() {
         return serverPortIds.size() > 1;
+    }
+
+    private boolean isDirectlyConnected(int destinationPort) {
+        return serverPortIds.contains(IdUtil.toId(destinationPort))
+    }
+
+    private void getConfigurationFromUser() {
+        System.out.println("Konfiguracja klienta. Użyć domyślnej ? y/n");
+//        if (false) {
+        if (!sc.next().trim().equals("y")) {
+            System.out.println("Podaj IP lub DNS serwera: ");
+            serverAddress = sc.next().trim();
+            System.out.println("Podaj port serwera: ");
+            serverPort = sc.next().trim();
+            System.out.println("Podaj nazwę serwera: ");
+            serverName = sc.next().trim();
+        }
     }
 
 }

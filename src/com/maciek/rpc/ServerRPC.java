@@ -33,13 +33,14 @@ public class ServerRPC {
     }
 
     public Vector show(int serverId) {
-        System.out.println(this.id+" "+serverId);
+        System.out.println(this.id + " " + serverId);
         if (this.id == serverId) {
             return show();
         } else {
             try {
                 return client.getServerMethods(IdUtil.toPort(serverId));
             } catch (Exception e) {
+                e.printStackTrace();
                 return null;
             }
         }
@@ -101,8 +102,13 @@ public class ServerRPC {
         return methodDto;
     }
 
-    public Object[] delegateMethod(int destinationPort, int methodIndex){
-        return
+    public Vector redirectMethodCall(int destinationPort, int methodIndex, Vector callParams) {
+        try {
+            return client.callMethodUsingCallParams(destinationPort, methodIndex, callParams);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
     }
 
 }
